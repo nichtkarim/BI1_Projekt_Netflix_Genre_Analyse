@@ -9,8 +9,8 @@ import os  # Importiere os zur Arbeit mit Dateisystempfaden
 # Konfigurationsvariablen für Dateipfade und Parameter
 FILE_PATH = 'Daten/Netflix_Bereinigt.csv'  # Pfad zur Input-CSV-Datei
 BASE_OUTPUT_PATH = 'Daten/Ergebnisse/'  # Basisordner für Ergebnisdateien
-MIN_SUPPORT = 0.03  # Mindest-Support für Itemset-Berechnung (als Anteil)
-MIN_CONFIDENCE = 0.4  # Mindest-Konfidenz für Assoziationsregeln (als Anteil)
+MIN_SUPPORT = 0.05  # Mindest-Support für Itemset-Berechnung (als Anteil)
+MIN_CONFIDENCE = 0.5  # Mindest-Konfidenz für Assoziationsregeln (als Anteil)
 
 # Generiere einen Zeitstempel für den Ergebnisordner
 DATUM_ZEIT = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
