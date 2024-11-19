@@ -16,7 +16,7 @@ Dieses Projekt führt eine Assoziationsanalyse basierend auf häufigen Itemsets 
 
 1. Klone das Repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/nichtkarim/BI1_Projekt_Netflix_Genre_Analyse/blob/d2bc9ad1dc587ab1d245758dde559f6589f2c5c1/
    ```
 2. Wechsel in das Verzeichnis:
    ```bash
