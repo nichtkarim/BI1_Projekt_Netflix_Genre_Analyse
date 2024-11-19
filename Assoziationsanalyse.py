@@ -9,8 +9,6 @@ import os  # Importiere os zur Arbeit mit Dateisystempfaden
 # Konfigurationsvariablen für Dateipfade und Parameter
 FILE_PATH = 'Daten/Netflix_Bereinigt.csv'  # Pfad zur Input-CSV-Datei
 BASE_OUTPUT_PATH = 'Daten/Ergebnisse/'  # Basisordner für Ergebnisdateien
-MIN_SUPPORT = 0.05  # Mindest-Support für Itemset-Berechnung (als Anteil)
-MIN_CONFIDENCE = 0.5  # Mindest-Konfidenz für Assoziationsregeln (als Anteil)
 
 # Generiere einen Zeitstempel für den Ergebnisordner
 DATUM_ZEIT = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -26,11 +24,22 @@ def lade_und_bereite_daten_vor(file_path):
     print(f"Daten erfolgreich geladen. Anzahl der Zeilen: {len(daten)}, Anzahl der Spalten: {len(daten.columns)}")
     return daten.iloc[:, 1:]  # Entferne die erste Spalte (falls ID-Spalte vorhanden)
 
+# Funktion zur Eingabe von Mindest-Support und Mindest-Konfidenz
+def eingabe_parameter():
+    while True:
+        try:
+            min_support = float(input("Bitte geben Sie den Mindest-Support ein (in Prozent, z.B. 5 für 5%): ")) / 100
+            min_confidence = float(input("Bitte geben Sie die Mindest-Konfidenz ein (in Prozent, z.B. 50 für 50%): ")) / 100
+            if 0 < min_support <= 1 and 0 < min_confidence <= 1:
+                break
+            else:
+                print("Bitte geben Sie Werte zwischen 0 und 100 ein.")
+        except ValueError:
+            print("Ungültige Eingabe. Bitte geben Sie numerische Werte ein.")
+    return min_support, min_confidence
+
 # Funktion zur Berechnung von häufigen Itemsets
 def berechne_haeufige_itemsets(daten, min_support):
-    """
-    Berechnet häufige Itemsets basierend auf dem Mindest-Support, inklusive einzelner Items.
-    """
     print(f"Berechne häufige Itemsets mit Mindest-Support von {min_support * 100:.0f}%...")
     # Berechne den Support einzelner Items
     einzel_items = daten.iloc[:, 3:].sum(axis=0) / len(daten)
@@ -52,24 +61,24 @@ def berechne_haeufige_itemsets(daten, min_support):
 
 # Funktion zur Generierung von Assoziationsregeln
 def generiere_assoziationsregeln(itemsets, daten, min_confidence):
-    """
-    Generiert Assoziationsregeln basierend auf häufigen Itemsets und Mindest-Konfidenz.
-    """
     print(f"Generiere Assoziationsregeln mit Mindest-Konfidenz von {min_confidence * 100:.0f}%...")
     regeln = []
+    itemset_dict = {tuple(sorted(itemset)): support for itemset, support in itemsets}
     for itemset, support in itemsets:
         if len(itemset) > 1:  # Betrachte nur Itemsets mit mindestens zwei Items
             subsets = list(chain.from_iterable(combinations(itemset, r) for r in range(1, len(itemset))))
             for vorlaeufer in subsets:
-                konsequenz = set(itemset) - set(vorlaeufer)  # Konsequenz ist der Rest des Itemsets
+                vorlaeufer = tuple(sorted(vorlaeufer))
+                konsequenz = tuple(sorted(set(itemset) - set(vorlaeufer)))
                 if konsequenz:
-                    # Berechne Konfidenz und Lift
-                    support_vorlaeufer = daten[list(vorlaeufer)].all(axis=1).sum() / len(daten)
-                    konfidenz = support / support_vorlaeufer
-                    support_konsequenz = daten[list(konsequenz)].all(axis=1).sum() / len(daten)
-                    lift = konfidenz / support_konsequenz
-                    if konfidenz >= min_confidence:
-                        regeln.append((set(vorlaeufer), konsequenz, support * 100, konfidenz * 100, lift))
+                    support_vorlaeufer = itemset_dict.get(vorlaeufer, None)
+                    if support_vorlaeufer:
+                        konfidenz = support / support_vorlaeufer
+                        support_konsequenz = itemset_dict.get(konsequenz, None)
+                        if support_konsequenz:
+                            lift = konfidenz / (support_konsequenz)
+                            if konfidenz >= min_confidence:
+                                regeln.append((set(vorlaeufer), set(konsequenz), support * 100, konfidenz * 100, lift))
 
     print(f"Gefundene Assoziationsregeln: {len(regeln)}")
     # Erstelle ein DataFrame mit den Regeln und deren Metriken
@@ -79,167 +88,118 @@ def generiere_assoziationsregeln(itemsets, daten, min_confidence):
     df["Konsequenz"] = df["Konsequenz"].apply(lambda x: " UND ".join(sorted(x)))
     return df
 
-
 def visualisiere_itemsets(itemsets_df, output_path):
-    # Gibt eine Meldung aus, dass die Visualisierung beginnt
     print("Visualisiere häufige Itemsets...")
-
-    # Sortiere die Itemsets nach Support in absteigender Reihenfolge und wähle die Top 10 aus
     top_itemsets = itemsets_df.sort_values(by="Support", ascending=False).head(10)
-
-    # Erstelle ein horizontales Balkendiagramm
-    plt.figure(figsize=(10, 6))  # Definiere die Größe des Diagramms
+    plt.figure(figsize=(10, 6))
     plt.barh(
         [" & ".join(i) for i in top_itemsets["Itemset"]],
-        # Kombiniere die Items eines Itemsets mit "&" als Trennzeichen
-        top_itemsets["Support"],  # Werte für die Höhe der Balken
-        color="skyblue"  # Balkenfarbe
+        top_itemsets["Support"],
+        color="skyblue"
     )
-    plt.xlabel("Support (%)")  # Beschriftung der x-Achse
-    plt.title("Top 10 Häufige Itemsets")  # Titel des Diagramms
-    plt.gca().invert_yaxis()  # Drehe die y-Achse um, damit die höchsten Werte oben sind
-
-    # Speichere das Diagramm als Bilddatei
+    plt.xlabel("Support (%)")
+    plt.title("Top 10 Häufige Itemsets")
+    plt.gca().invert_yaxis()
     filename = os.path.join(output_path, 'top_itemsets_balkendiagramm.png')
     plt.savefig(filename)
     print(f"Balkendiagramm gespeichert unter: {filename}")
-    plt.show()  # Zeige das Diagramm an
-
+    plt.show()
 
 def visualisiere_verteilung_items(daten, output_path):
-    # Gibt eine Meldung aus, dass die Visualisierung beginnt
     print("Visualisiere Verteilung von häufig vorkommenden Items...")
-
-    # Berechne die Häufigkeit der Items und wähle die Top 10
     item_counts = daten.iloc[:, 3:].sum(axis=0).sort_values(ascending=False).head(10)
-
-    # Erstelle ein Balkendiagramm der Itemverteilung
-    plt.figure(figsize=(10, 6))  # Definiere die Größe des Diagramms
-    plt.bar(item_counts.index, item_counts.values, color="skyblue")  # Items und deren Häufigkeiten
-    plt.xlabel("Item")  # Beschriftung der x-Achse
-    plt.ylabel("Häufigkeit")  # Beschriftung der y-Achse
-    plt.title("Verteilung der häufigsten Items")  # Titel des Diagramms
-    plt.xticks(rotation=45)  # Drehung der x-Achsen-Beschriftungen für bessere Lesbarkeit
-
-    # Speichere das Diagramm als Bilddatei
+    plt.figure(figsize=(10, 6))
+    plt.bar(item_counts.index, item_counts.values, color="skyblue")
+    plt.xlabel("Item")
+    plt.ylabel("Häufigkeit")
+    plt.title("Verteilung der häufigsten Items")
+    plt.xticks(rotation=45)
     filename = os.path.join(output_path, 'verteilung_items.png')
     plt.savefig(filename)
     print(f"Verteilung gespeichert unter: {filename}")
-    plt.show()  # Zeige das Diagramm an
-
+    plt.show()
 
 def visualisiere_top_regeln(regeln_df, output_path, metriken="Konfidenz (%)"):
-    # Gibt eine Meldung aus, dass die Visualisierung beginnt
     print(f"Visualisiere Top-Regeln nach {metriken}...")
-
-    # Überprüfe, ob die angegebene Metrik in den Daten vorhanden ist
     if metriken not in regeln_df.columns:
         print(f"Spalte '{metriken}' nicht in den Daten verfügbar.")
         return
-
-    # Sortiere die Regeln nach der angegebenen Metrik und wähle die Top 10
     top_regeln = regeln_df.sort_values(by=metriken, ascending=False).head(10)
-
-    # Erstelle ein horizontales Balkendiagramm für die Top-Regeln
-    plt.figure(figsize=(10, 6))  # Definiere die Größe des Diagramms
+    plt.figure(figsize=(10, 6))
     plt.barh(
-        top_regeln["Vorläufer"] + " → " + top_regeln["Konsequenz"],  # Beschriftung der Regeln
-        top_regeln[metriken],  # Werte der Metrik
-        color="lightgreen"  # Balkenfarbe
+        top_regeln["Vorläufer"] + " → " + top_regeln["Konsequenz"],
+        top_regeln[metriken],
+        color="lightgreen"
     )
-    plt.xlabel(metriken)  # Beschriftung der x-Achse
-    plt.title(f"Top 10 Regeln nach {metriken}")  # Titel des Diagramms
-    plt.gca().invert_yaxis()  # Drehe die y-Achse um
-
-    # Speichere das Diagramm als Bilddatei
+    plt.xlabel(metriken)
+    plt.title(f"Top 10 Regeln nach {metriken}")
+    plt.gca().invert_yaxis()
     filename = os.path.join(output_path, f'top_regeln_{metriken.lower().replace(" ", "_")}.png')
     plt.savefig(filename)
     print(f"Top-Regeln gespeichert unter: {filename}")
-    plt.show()  # Zeige das Diagramm an
-
+    plt.show()
 
 def visualisiere_erweiterte_heatmap(regeln_df, output_path):
-    # Gibt eine Meldung aus, dass die Erstellung der Heatmap beginnt
     print("Erstelle erweiterte Heatmap für Leverage und Conviction...")
-
-    # Berechne zusätzliche Metriken: Leverage und Conviction
-    regeln_df["Leverage"] = regeln_df["Support (%)"] / 100 - (regeln_df["Konfidenz (%)"] / 100) * (regeln_df["Lift"])
-    regeln_df["Conviction"] = (1 - regeln_df["Konfidenz (%)"] / 100) / (1 - regeln_df["Lift"])
-
-    # Liste der Metriken für die Erstellung der Heatmaps
+    regeln_df["Leverage"] = (regeln_df["Support (%)"] / 100) - (
+        (regeln_df["Vorläufer"].map(regeln_df.groupby("Vorläufer")["Support (%)"].mean()) / 100) *
+        (regeln_df["Konsequenz"].map(regeln_df.groupby("Konsequenz")["Support (%)"].mean()) / 100)
+    )
+    regeln_df["Conviction"] = (1 - (regeln_df["Konsequenz"].map(regeln_df.groupby("Konsequenz")["Support (%)"].mean()) / 100)) / (
+        1 - (regeln_df["Konfidenz (%)"] / 100)
+    )
     metrics = ["Leverage", "Conviction"]
     for metric in metrics:
-        # Erstelle eine Pivot-Tabelle für die Heatmap
         heatmap_data = regeln_df.pivot_table(index="Vorläufer", columns="Konsequenz", values=metric, aggfunc="mean")
-
-        # Überprüfe, ob Daten für die Heatmap verfügbar sind
         if not heatmap_data.empty:
-            plt.figure(figsize=(12, 8))  # Definiere die Größe der Heatmap
-            sns.heatmap(heatmap_data, annot=True, cmap="coolwarm", fmt=".2f")  # Erstelle die Heatmap
-            plt.title(f"Heatmap für {metric}")  # Titel der Heatmap
-            plt.xlabel("Konsequenz")  # Beschriftung der x-Achse
-            plt.ylabel("Vorläufer")  # Beschriftung der y-Achse
-
-            # Speichere die Heatmap als Bilddatei
+            plt.figure(figsize=(12, 8))
+            sns.heatmap(heatmap_data, annot=True, cmap="coolwarm", fmt=".2f")
+            plt.title(f"Heatmap für {metric}")
+            plt.xlabel("Konsequenz")
+            plt.ylabel("Vorläufer")
             filename = os.path.join(output_path, f'{metric.lower()}_heatmap.png')
             plt.savefig(filename)
             print(f"{metric}-Heatmap gespeichert unter: {filename}")
-            plt.show()  # Zeige die Heatmap an
-
+            plt.show()
 
 def visualisiere_lift_heatmap(regeln_df, output_path):
-    """
-    Erstellt eine Heatmap der Lift-Werte.
-    """
     print("Erstelle Heatmap der Lift-Werte...")
-
-    # Erstelle eine Pivot-Tabelle für die Lift-Werte
     heatmap_data = regeln_df.pivot_table(index="Vorläufer", columns="Konsequenz", values="Lift", aggfunc="mean")
-
-    # Überprüfe, ob Daten für die Heatmap verfügbar sind
     if not heatmap_data.empty:
-        plt.figure(figsize=(12, 8))  # Definiere die Größe der Heatmap
-        sns.heatmap(heatmap_data, annot=True, cmap="YlGnBu", fmt=".2f")  # Erstelle die Heatmap
-        plt.title("Heatmap der Lift-Werte")  # Titel der Heatmap
-        plt.xlabel("Konsequenz")  # Beschriftung der x-Achse
-        plt.ylabel("Vorläufer")  # Beschriftung der y-Achse
-
-        # Speichere die Heatmap als Bilddatei
+        plt.figure(figsize=(12, 8))
+        sns.heatmap(heatmap_data, annot=True, cmap="YlGnBu", fmt=".2f")
+        plt.title("Heatmap der Lift-Werte")
+        plt.xlabel("Konsequenz")
+        plt.ylabel("Vorläufer")
         filename = os.path.join(output_path, 'lift_heatmap.png')
         plt.savefig(filename)
         print(f"Heatmap gespeichert unter: {filename}")
-        plt.show()  # Zeige die Heatmap an
+        plt.show()
     else:
         print("Heatmap konnte nicht erstellt werden, da keine Daten vorhanden sind.")
 
-
 def visualisiere_scatterplot(regeln_df, output_path, x="Support (%)", y="Konfidenz (%)"):
-    # Gibt eine Meldung aus, dass die Erstellung des Scatterplots beginnt
     print(f"Erstelle Scatterplot für {x} vs. {y}...")
-
-    # Erstelle den Scatterplot
-    plt.figure(figsize=(10, 6))  # Definiere die Größe des Scatterplots
+    plt.figure(figsize=(10, 6))
     plt.scatter(
-        regeln_df[x], regeln_df[y],  # Achsendaten
-        alpha=0.7, edgecolors="w", linewidth=0.5  # Optische Einstellungen
+        regeln_df[x], regeln_df[y],
+        alpha=0.7, edgecolors="w", linewidth=0.5
     )
-    plt.xlabel(x)  # Beschriftung der x-Achse
-    plt.ylabel(y)  # Beschriftung der y-Achse
-    plt.title(f"Scatterplot: {x} vs. {y}")  # Titel des Scatterplots
-
-    # Speichere den Scatterplot als Bilddatei
+    plt.xlabel(x)
+    plt.ylabel(y)
+    plt.title(f"Scatterplot: {x} vs. {y}")
     filename = os.path.join(output_path,
                             f'scatterplot_{x.lower().replace(" ", "_")}_vs_{y.lower().replace(" ", "_")}.png')
     plt.savefig(filename)
     print(f"Scatterplot gespeichert unter: {filename}")
-    plt.show()  # Zeige den Scatterplot an
-
+    plt.show()
 
 def main():
     daten = lade_und_bereite_daten_vor(FILE_PATH)
+    min_support, min_confidence = eingabe_parameter()
 
     # Häufige Itemsets berechnen
-    itemsets_df = berechne_haeufige_itemsets(daten, MIN_SUPPORT)
+    itemsets_df = berechne_haeufige_itemsets(daten, min_support)
     itemsets_filename = os.path.join(OUTPUT_PATH, 'haeufige_itemsets.csv')
     itemsets_df.to_csv(itemsets_filename, index=False)
     print(f"Häufige Itemsets gespeichert unter: {itemsets_filename}")
@@ -251,7 +211,7 @@ def main():
 
     # Assoziationsregeln erstellen
     itemsets = [(tuple(itemset), support / 100) for itemset, support in itemsets_df.values]
-    regeln_df = generiere_assoziationsregeln(itemsets, daten, MIN_CONFIDENCE)
+    regeln_df = generiere_assoziationsregeln(itemsets, daten, min_confidence)
     regeln_filename = os.path.join(OUTPUT_PATH, 'assoziationsregeln.csv')
     regeln_df.to_csv(regeln_filename, index=False)
     print(f"Assoziationsregeln gespeichert unter: {regeln_filename}")
@@ -271,9 +231,6 @@ def main():
     visualisiere_erweiterte_heatmap(regeln_df, OUTPUT_PATH)
     visualisiere_scatterplot(regeln_df, OUTPUT_PATH, x="Support (%)", y="Konfidenz (%)")
     visualisiere_scatterplot(regeln_df, OUTPUT_PATH, x="Lift", y="Konfidenz (%)")
-
-
-
 
 if __name__ == "__main__":
     main()
