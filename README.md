@@ -42,20 +42,8 @@ Dieses Projekt führt eine Assoziationsanalyse basierend auf häufigen Itemsets 
   - seaborn
   - networkx
 
-## Dateistruktur
 
-```plaintext
-BI1_Projekt_Netflix_Genre_Analyse/
-├── .venv/                     # Virtuelle Umgebung (optional)
-├── Daten/
-│   ├── Ergebnisse/            # Ordner für generierte Ergebnisse
-│   └── Netflix_Bereinigt.csv  # Eingabedaten
-├── Assoziationsanalyse.py     # Hauptskript
-├── README.md                  # Projektbeschreibung
-└── requirements.txt           # Abhängigkeiten
-
-```
-
+    
 ## Dateistruktur
 
 ```plaintext
