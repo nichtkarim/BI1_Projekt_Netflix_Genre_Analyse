@@ -22,7 +22,7 @@ Dieses Projekt führt eine Assoziationsanalyse basierend auf häufigen Itemsets 
    ```bash
    cd /BI1_Projekt_Netflix_Genre_Analyse
    ```
-3. Erstelle und aktiviere eine virtuelle Umgebung:
+3. Erstelle und aktiviere eine virtuelle Umgebung(Optional):
    ```bash
    python -m venv .venv
    source .venv/bin/activate  # Linux/Mac
