@@ -20,7 +20,7 @@ Dieses Projekt führt eine Assoziationsanalyse basierend auf häufigen Itemsets 
    ```
 2. Wechsel in das Verzeichnis:
    ```bash
-   cd <repository-name>
+   cd /BI1_Projekt_Netflix_Genre_Analyse
    ```
 3. Erstelle und aktiviere eine virtuelle Umgebung:
    ```bash
@@ -45,13 +45,28 @@ Dieses Projekt führt eine Assoziationsanalyse basierend auf häufigen Itemsets 
 ## Dateistruktur
 
 ```plaintext
-Projekt/
+BI1_Projekt_Netflix_Genre_Analyse/
+├── .venv/                     # Virtuelle Umgebung (optional)
 ├── Daten/
-│   ├── Netflix_Bereinigt.csv      # Eingabedaten
-│   └── Ergebnisse/                # Generierte Ergebnisse
-├── Assoziationsanalyse.py         # Hauptskript
-├── README.md                      # Projektbeschreibung
-└── requirements.txt               # Abhängigkeiten
+│   ├── Ergebnisse/            # Ordner für generierte Ergebnisse
+│   └── Netflix_Bereinigt.csv  # Eingabedaten
+├── Assoziationsanalyse.py     # Hauptskript
+├── README.md                  # Projektbeschreibung
+└── requirements.txt           # Abhängigkeiten
+
+```
+
+## Dateistruktur
+
+```plaintext
+BI1_Projekt_Netflix_Genre_Analyse/
+├── .venv/                     # Virtuelle Umgebung (optional)
+├── Daten/
+│   ├── Ergebnisse/            # Ordner für generierte Ergebnisse
+│   └── Netflix_Bereinigt.csv  # Eingabedaten
+├── Assoziationsanalyse.py     # Hauptskript
+├── README.md                  # Projektbeschreibung
+└── requirements.txt           # Abhängigkeiten
 ```
 
 ## Funktionen
@@ -70,19 +85,46 @@ Projekt/
   - Heatmaps für Metriken wie Lift, Leverage und Conviction.
   - Scatterplots für Support, Konfidenz und Lift.
 
-### Eingabedaten
+## Eingabedaten
 
 - **Dateiname:** `Netflix_Bereinigt.csv`
-- **Format:** CSV mit den Spalten:
-  - Benutzer-ID
-  - Timestamp
-  - Genre (binarisiert)
+- **Format:** CSV mit den folgenden Spalten:
+  - `title`: Titel des Films oder der Serie.
+  - `type`: Typ, z. B. `movie` oder `series`.
+  - `releaseYear`: Veröffentlichungsjahr.
+  - Über 35 Spalten, die Genres repräsentieren (binarisiert, 1 = Genre zutreffend, 0 = nicht zutreffend).
+
+### Beispieldaten
+1. **Titel:** The Fifth Element
+   - Typ: movie
+   - Veröffentlichungsjahr: 1997
+   - Genres: Action, Adventure, Sci-Fi.
+
+2. **Titel:** Kill Bill: Vol. 1
+   - Typ: movie
+   - Veröffentlichungsjahr: 2003
+   - Genres: Action, Crime, Thriller.
+
+3. **Titel:** Jarhead
+   - Typ: movie
+   - Veröffentlichungsjahr: 2005
+   - Genres: Biography, Drama, War.
+
+4. **Titel:** Unforgiven
+   - Typ: movie
+   - Veröffentlichungsjahr: 1992
+   - Genres: Drama, Western.
+
+5. **Titel:** Eternal Sunshine of the Spotless Mind
+   - Typ: movie
+   - Veröffentlichungsjahr: 2004
+   - Genres: Drama, Romance, Sci-Fi.
 
 ## Ergebnisse
 
 - Häufige Itemsets werden in der Datei `haeufige_itemsets.csv` gespeichert.
 - Generierte Assoziationsregeln werden in der Datei `assoziationsregeln.csv` gespeichert.
-- Visualisierungen werden als PNG-Dateien im Ordner `Ergebnisse_<DATUM-ZEIT>` gespeichert.
+- Visualisierungen werden als PNG-Dateien im Ordner `Daten/Ergebnisse/` gespeichert.
 
 ## Visualisierungen
 
