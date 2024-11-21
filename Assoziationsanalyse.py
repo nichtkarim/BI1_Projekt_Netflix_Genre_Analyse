@@ -6,7 +6,7 @@ from datetime import datetime  # Importiere datetime für Zeit- und Datumsangabe
 import os  # Importiere os zur Arbeit mit Dateisystempfaden
 
 # Konfigurationsvariablen für Dateipfade und Parameter
-FILE_PATH = 'Daten/Netflix_Bereinigt.csv'  # Pfad zur Input-CSV-Datei
+FILE_PATH = 'Daten/cleaned_data.csv'  # Pfad zur Input-CSV-Datei
 BASE_OUTPUT_PATH = 'Daten/Ergebnisse/'  # Basisordner für Ergebnisdateien
 
 # Generiere einen Zeitstempel für den Ergebnisordner
