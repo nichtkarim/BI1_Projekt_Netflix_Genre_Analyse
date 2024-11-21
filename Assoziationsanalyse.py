@@ -1,6 +1,5 @@
 import pandas as pd  # Importiere pandas für die Arbeit mit Datenframes
 import matplotlib.pyplot as plt  # Importiere Matplotlib für Diagrammerstellung
-import networkx as nx  # Importiere NetworkX zur Erstellung von Netzwerken
 from itertools import combinations, chain  # Importiere Tools zur Arbeit mit Kombinationen
 import seaborn as sns  # Importiere Seaborn für erweiterte Visualisierungen
 from datetime import datetime  # Importiere datetime für Zeit- und Datumsangaben
