@@ -1,182 +1,147 @@
-import pandas as pd  # Importiere pandas für die Arbeit mit Datenframes
-import matplotlib.pyplot as plt  # Importiere Matplotlib für Diagrammerstellung
-from itertools import combinations, chain  # Importiere Tools zur Arbeit mit Kombinationen
-from datetime import datetime  # Importiere datetime für Zeit- und Datumsangaben
-import os  # Importiere os zur Arbeit mit Dateisystempfaden
+import pandas as pd
+import matplotlib.pyplot as plt
+from itertools import combinations, chain
+from datetime import datetime
+import os
 
-# Konfigurationsvariablen für Dateipfade und Parameter
-FILE_PATH = 'Daten/cleaned_data.csv'  # Pfad zur Input-CSV-Datei
-BASE_OUTPUT_PATH = 'Daten/Ergebnisse/'  # Basisordner für Ergebnisdateien
+# Diese Funktion erstellt einen neuen Ordner, in dem die Ergebnisse des Programms gespeichert werden.
+# Ein Zeitstempel wird verwendet, um sicherzustellen, dass der Ordnername eindeutig ist.
+# Wenn der Ordner bereits existiert, wird er nicht erneut erstellt.
+def erstelle_ausgabe_ordner(base_path):
+    datum_zeit = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    output_path = os.path.join(base_path, f"Ergebnisse_{datum_zeit}/")
+    os.makedirs(output_path, exist_ok=True)
+    return output_path
 
-# Generiere einen Zeitstempel für den Ergebnisordner
-DATUM_ZEIT = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-OUTPUT_PATH = os.path.join(BASE_OUTPUT_PATH, f"Ergebnisse_{DATUM_ZEIT}/")  # Kombiniere Basisordner und Zeitstempel
+# Diese Funktion lädt die Daten aus einer CSV-Datei, entfernt die erste Spalte (z. B. ID-Spalte) und gibt den Rest zurück.
+def lade_daten(file_path):
+    print("Lade Daten...")
+    daten = pd.read_csv(file_path)
+    print(f"Daten geladen: {len(daten)} Zeilen, {len(daten.columns)} Spalten.")
+    return daten.iloc[:, 1:]
 
-# Erstelle den Ergebnisordner, falls er nicht existiert
-os.makedirs(OUTPUT_PATH, exist_ok=True)  # Überprüft, ob der Ordner existiert, und erstellt ihn falls nicht
-
-# Funktion zum Laden und Vorbereiten der Daten aus der CSV-Datei
-def lade_und_bereite_daten_vor(file_path):
-    print("Lade Daten...")  # Ausgabe, dass die Daten geladen werden
-    daten = pd.read_csv(file_path)  # CSV-Datei wird eingelesen
-    print(f"Daten erfolgreich geladen. Anzahl der Zeilen: {len(daten)}, Anzahl der Spalten: {len(daten.columns)}")  # Datenübersicht
-    return daten.iloc[:, 1:]  # Entferne die erste Spalte (z. B. ID-Spalte)
-
-# Funktion zur Eingabe von Mindest-Support und Mindest-Konfidenz
+# Diese Funktion ermöglicht die Eingabe von Mindest-Support und Mindest-Konfidenz.
+# Beide Werte müssen zwischen 0 und 100 Prozent liegen.
 def eingabe_parameter():
-    while True:
-        try:
-            # Mindest-Support eingeben und in Prozent umrechnen
-            min_support = float(input("Bitte geben Sie den Mindest-Support ein (in Prozent, z.B. 5 für 5%): ")) / 100
-            # Mindest-Konfidenz eingeben und in Prozent umrechnen
-            min_confidence = float(input("Bitte geben Sie die Mindest-Konfidenz ein (in Prozent, z.B. 50 für 50%): ")) / 100
-            # Werte validieren
-            if 0 < min_support <= 1 and 0 < min_confidence <= 1:
-                break  # Werte sind gültig, Schleife verlassen
-            else:
-                print("Bitte geben Sie Werte zwischen 0 und 100 ein.")  # Fehlerhinweis
-        except ValueError:
-            print("Ungültige Eingabe. Bitte geben Sie numerische Werte ein.")  # Hinweis bei fehlerhafter Eingabe
-    return min_support, min_confidence  # Rückgabe der Eingabewerte
+    def eingabe(prompt):
+        while True:
+            try:
+                wert = float(input(prompt)) / 100
+                if 0 < wert <= 1:
+                    return wert
+                else:
+                    print("Bitte geben Sie einen Wert zwischen 0 und 100 ein.")
+            except ValueError:
+                print("Ungültige Eingabe. Bitte numerische Werte eingeben.")
+    min_support = eingabe("Mindest-Support (%): ")
+    min_confidence = eingabe("Mindest-Konfidenz (%): ")
+    return min_support, min_confidence
 
-# Funktion zur Berechnung von häufigen Itemsets
-def berechne_haeufige_itemsets(daten, min_support):
-    print(f"Berechne häufige Itemsets mit Mindest-Support von {min_support * 100:.0f}%...")  # Ausgabe des Prozesses
-    # Berechne den Support jedes Einzelitems
+# Diese Funktion berechnet die häufigen Itemsets basierend auf dem angegebenen Mindest-Support.
+# Sie erstellt zunächst Einzel-Itemsets und erweitert diese durch Kombinationen höherer Grade.
+def berechne_itemsets(daten, min_support):
+    print(f"Berechne Itemsets mit Mindest-Support {min_support * 100:.0f}%...")
     einzel_items = daten.iloc[:, 3:].sum(axis=0) / len(daten)
-    # Filtere Items basierend auf dem Mindest-Support
     einzel_items = einzel_items[einzel_items >= min_support]
-    # Konvertiere Einzelitems in Itemsets
     itemsets = [(tuple([item]), support) for item, support in einzel_items.items()]
 
-    # Iteriere über Kombinationen höherer Grade
-    for itemset_size in range(2, len(einzel_items) + 1):
-        for itemset in combinations(einzel_items.index, itemset_size):
-            # Berechne den Support für das Itemset
+    for size in range(2, len(einzel_items) + 1):
+        for itemset in combinations(einzel_items.index, size):
             support = daten[list(itemset)].all(axis=1).sum() / len(daten)
-            if support >= min_support:  # Überprüfe, ob der Support ausreichend ist
+            if support >= min_support:
                 itemsets.append((itemset, support))
 
-    print(f"Gefundene häufige Itemsets: {len(itemsets)}")  # Anzahl gefundener Itemsets
-    # Erstelle DataFrame für die Itemsets
     df = pd.DataFrame(itemsets, columns=["Itemset", "Support"])
-    df["Support"] = df["Support"] * 100  # Konvertiere Support in Prozent
-    return df  # Rückgabe des DataFrames
+    df["Support"] *= 100
+    return df
 
-# Funktion zur Generierung von Assoziationsregeln
-def generiere_assoziationsregeln(itemsets, daten, min_confidence):
-    print(f"Generiere Assoziationsregeln mit Mindest-Konfidenz von {min_confidence * 100:.0f}%...")  # Statusmeldung
-    regeln = []  # Initialisiere leere Liste für Regeln
-    # Erstelle ein Dictionary für schnellen Zugriff auf Support-Werte
+# Diese Funktion generiert Assoziationsregeln basierend auf den häufigen Itemsets und der Mindest-Konfidenz.
+# Jede Regel wird als Vorläufer (Antezedenz) und Konsequenz mit den zugehörigen Metriken ausgegeben.
+def generiere_regeln(itemsets, daten, min_confidence):
+    print(f"Generiere Regeln mit Mindest-Konfidenz {min_confidence * 100:.0f}%...")
+    regeln = []
     itemset_dict = {tuple(sorted(itemset)): support for itemset, support in itemsets}
 
-    # Iteriere über alle Itemsets
     for itemset, support in itemsets:
-        if len(itemset) > 1:  # Betrachte nur Itemsets mit mehr als einem Item
-            subsets = list(chain.from_iterable(combinations(itemset, r) for r in range(1, len(itemset))))  # Erstelle Teilmengen
+        if len(itemset) > 1:
+            subsets = list(chain.from_iterable(combinations(itemset, r) for r in range(1, len(itemset))))
             for vorlaeufer in subsets:
-                vorlaeufer = tuple(sorted(vorlaeufer))  # Sortiere den Vorläufer
-                konsequenz = tuple(sorted(set(itemset) - set(vorlaeufer)))  # Bestimme Konsequenz
-                if konsequenz:  # Überprüfe, ob Konsequenz existiert
-                    support_vorlaeufer = itemset_dict.get(vorlaeufer, None)  # Hole Support des Vorläufers
+                vorlaeufer = tuple(sorted(vorlaeufer))
+                konsequenz = tuple(sorted(set(itemset) - set(vorlaeufer)))
+                if konsequenz:
+                    support_vorlaeufer = itemset_dict.get(vorlaeufer)
                     if support_vorlaeufer:
-                        konfidenz = support / support_vorlaeufer  # Berechne Konfidenz
-                        support_konsequenz = itemset_dict.get(konsequenz, None)  # Hole Support der Konsequenz
-                        if support_konsequenz:
-                            lift = konfidenz / support_konsequenz  # Berechne Lift
-                            if konfidenz >= min_confidence:  # Überprüfe Mindest-Konfidenz
-                                regeln.append((set(vorlaeufer), set(konsequenz), support * 100, konfidenz * 100, lift))  # Füge Regel hinzu
+                        konfidenz = support / support_vorlaeufer
+                        if konfidenz >= min_confidence:
+                            regeln.append((vorlaeufer, konsequenz, support * 100, konfidenz * 100))
 
-    print(f"Gefundene Assoziationsregeln: {len(regeln)}")  # Anzahl der Regeln
-    # Erstelle DataFrame für Regeln
-    df = pd.DataFrame(regeln, columns=["Vorläufer", "Konsequenz", "Support (%)", "Konfidenz (%)", "Lift"])
-    df["Vorläufer"] = df["Vorläufer"].apply(lambda x: " UND ".join(sorted(x)))  # Formatierung der Vorläufer
-    df["Konsequenz"] = df["Konsequenz"].apply(lambda x: " UND ".join(sorted(x)))  # Formatierung der Konsequenzen
-    return df  # Rückgabe des DataFrames
+    df = pd.DataFrame(regeln, columns=["Vorläufer", "Konsequenz", "Support (%)", "Konfidenz (%)"])
+    df["Vorläufer"] = df["Vorläufer"].apply(lambda x: " UND ".join(x))
+    df["Konsequenz"] = df["Konsequenz"].apply(lambda x: " UND ".join(x))
+    return df
 
-# Funktion zur Visualisierung der häufigen Itemsets
+# Diese Funktion speichert einen DataFrame als CSV-Datei an einem angegebenen Pfad.
+def speichere_csv(df, filename):
+    df.to_csv(filename, index=False)
+    print(f"Datei gespeichert: {filename}")
+
+# Diese Funktion visualisiert die Top 10 häufigen Itemsets als Balkendiagramm und speichert die Grafik.
 def visualisiere_itemsets(itemsets_df, output_path):
-    print("Visualisiere häufige Itemsets...")  # Statusmeldung
-    top_itemsets = itemsets_df.sort_values(by="Support", ascending=False).head(10)  # Sortiere und wähle Top 10
-    plt.figure(figsize=(10, 6))  # Erstelle Grafik
-    plt.barh(
-        [" & ".join(i) for i in top_itemsets["Itemset"]],
-        top_itemsets["Support"],
-        color="skyblue"
-    )
-    plt.xlabel("Support (%)")  # Achsentitel
-    plt.title("Top 10 Häufige Itemsets")  # Diagrammtitel
-    plt.gca().invert_yaxis()  # Y-Achse umdrehen
-    filename = os.path.join(output_path, 'top_itemsets_balkendiagramm.png')  # Dateiname für Speicherung
-    plt.savefig(filename)  # Speichere Diagramm
-    print(f"Balkendiagramm gespeichert unter: {filename}")  # Speicherhinweis
-    plt.show()  # Zeige Diagramm an
+    print("Visualisiere häufige Itemsets...")
+    top_itemsets = itemsets_df.sort_values(by="Support", ascending=False).head(10)
+    plt.barh([" & ".join(i) for i in top_itemsets["Itemset"]], top_itemsets["Support"], color="skyblue")
+    plt.xlabel("Support (%)")
+    plt.title("Top 10 Häufige Itemsets")
+    plt.gca().invert_yaxis()
+    filename = os.path.join(output_path, 'top_itemsets.png')
+    plt.savefig(filename)
+    plt.show()
 
-# Funktion zur Visualisierung der Item-Verteilung
+# Diese Funktion visualisiert die Verteilung der häufigsten Items und speichert ein Balkendiagramm.
 def visualisiere_verteilung_items(daten, output_path):
-    print("Visualisiere Verteilung von häufig vorkommenden Items...")  # Statusmeldung
-    item_counts = daten.iloc[:, 3:].sum(axis=0).sort_values(ascending=False).head(10)  # Zähle Items
-    plt.figure(figsize=(10, 6))  # Erstelle Grafik
-    plt.bar(item_counts.index, item_counts.values, color="skyblue")  # Balkendiagramm
-    plt.xlabel("Item")  # Achsentitel
-    plt.ylabel("Häufigkeit")  # Achsentitel
-    plt.title("Verteilung der häufigsten Items")  # Diagrammtitel
-    plt.xticks(rotation=45)  # Drehe Achsenbeschriftung
-    filename = os.path.join(output_path, 'verteilung_items.png')  # Dateiname für Speicherung
-    plt.savefig(filename)  # Speichere Diagramm
-    print(f"Verteilung gespeichert unter: {filename}")  # Speicherhinweis
-    plt.show()  # Zeige Diagramm an
+    print("Visualisiere Verteilung von Items...")
+    item_counts = daten.iloc[:, 3:].sum(axis=0).sort_values(ascending=False).head(10)
+    plt.bar(item_counts.index, item_counts.values, color="skyblue")
+    plt.xlabel("Item")
+    plt.ylabel("Häufigkeit")
+    plt.title("Verteilung der häufigsten Items")
+    plt.xticks(rotation=45)
+    filename = os.path.join(output_path, 'item_verteilung.png')
+    plt.savefig(filename)
+    plt.show()
 
-# Funktion zur Visualisierung der Top-Regeln nach einer Metrik
+# Diese Funktion visualisiert die Top 10 Assoziationsregeln basierend auf einer gewählten Metrik (z. B. Konfidenz).
 def visualisiere_top_regeln(regeln_df, output_path, metriken="Konfidenz (%)"):
-    print(f"Visualisiere Top-Regeln nach {metriken}...")  # Statusmeldung
-    if metriken not in regeln_df.columns:  # Überprüfe, ob Metrik existiert
-        print(f"Spalte '{metriken}' nicht in den Daten verfügbar.")  # Fehlermeldung
-        return
-    top_regeln = regeln_df.sort_values(by=metriken, ascending=False).head(10)  # Sortiere und wähle Top 10
-    plt.figure(figsize=(10, 6))  # Erstelle Grafik
-    plt.barh(
-        top_regeln["Vorläufer"] + " → " + top_regeln["Konsequenz"],
-        top_regeln[metriken],
-        color="lightgreen"
-    )
-    plt.xlabel(metriken)  # Achsentitel
-    plt.title(f"Top 10 Regeln nach {metriken}")  # Diagrammtitel
-    plt.gca().invert_yaxis()  # Y-Achse umdrehen
-    filename = os.path.join(output_path, f'top_regeln_{metriken.lower().replace(" ", "_")}.png')  # Dateiname
-    plt.savefig(filename)  # Speichere Diagramm
-    print(f"Top-Regeln gespeichert unter: {filename}")  # Speicherhinweis
-    plt.show()  # Zeige Diagramm an
+    print(f"Visualisiere Top-Regeln nach {metriken}...")
+    top_regeln = regeln_df.sort_values(by=metriken, ascending=False).head(10)
+    plt.barh(top_regeln["Vorläufer"] + " → " + top_regeln["Konsequenz"], top_regeln[metriken], color="lightgreen")
+    plt.xlabel(metriken)
+    plt.title(f"Top 10 Regeln nach {metriken}")
+    plt.gca().invert_yaxis()
+    filename = os.path.join(output_path, f'top_regeln_{metriken.lower().replace(" ", "_")}.png')
+    plt.savefig(filename)
+    plt.show()
 
-# Hauptfunktion des Programms
+# Die Hauptfunktion steuert den Ablauf des Programms: Laden der Daten, Berechnung der Itemsets und Regeln,
+# sowie Speichern und Visualisieren der Ergebnisse.
 def main():
-    daten = lade_und_bereite_daten_vor(FILE_PATH)  # Lade Daten
-    min_support, min_confidence = eingabe_parameter()  # Eingabe der Parameter
+    file_path = 'Daten/cleaned_data.csv'
+    base_output_path = 'Daten/Ergebnisse/'
+    output_path = erstelle_ausgabe_ordner(base_output_path)
 
-    itemsets_df = berechne_haeufige_itemsets(daten, min_support)  # Berechnung der Itemsets
-    itemsets_filename = os.path.join(OUTPUT_PATH, 'haeufige_itemsets.csv')  # Speicherort
-    itemsets_df.to_csv(itemsets_filename, index=False)  # Speichere Itemsets
-    print(f"Häufige Itemsets gespeichert unter: {itemsets_filename}")  # Speicherhinweis
+    daten = lade_daten(file_path)
+    min_support, min_confidence = eingabe_parameter()
 
-    print("\n--- Häufige Itemsets (einschließlich einzelner Items) ---")  # Ausgabe
-    for i, row in itemsets_df.iterrows():  # Iteriere über Itemsets
-        print(f"{i + 1}. Itemset: {', '.join(row['Itemset'])} - Support: {row['Support']:.2f}%")  # Drucke Itemset
+    itemsets_df = berechne_itemsets(daten, min_support)
+    speichere_csv(itemsets_df, os.path.join(output_path, 'itemsets.csv'))
 
-    itemsets = [(tuple(itemset), support / 100) for itemset, support in itemsets_df.values]  # Konvertiere Itemsets
-    regeln_df = generiere_assoziationsregeln(itemsets, daten, min_confidence)  # Berechnung der Regeln
-    regeln_filename = os.path.join(OUTPUT_PATH, 'assoziationsregeln.csv')  # Speicherort
-    regeln_df.to_csv(regeln_filename, index=False)  # Speichere Regeln
-    print(f"Assoziationsregeln gespeichert unter: {regeln_filename}")  # Speicherhinweis
+    itemsets = [(tuple(itemset), support / 100) for itemset, support in itemsets_df.values]
+    regeln_df = generiere_regeln(itemsets, daten, min_confidence)
+    speichere_csv(regeln_df, os.path.join(output_path, 'regeln.csv'))
 
-    print("\n--- Erweiterte Assoziationsregeln (einschließlich 2. Grades) ---")  # Ausgabe
-    for i, row in regeln_df.iterrows():  # Iteriere über Regeln
-        print(f"{i + 1}. Regel: Wenn {row['Vorläufer']} DANN {row['Konsequenz']} "
-              f"- Support: {row['Support (%)']:.2f}%, Konfidenz: {row['Konfidenz (%)']:.2f}%, Lift: {row['Lift']:.2f}")
+    visualisiere_itemsets(itemsets_df, output_path)
+    visualisiere_verteilung_items(daten, output_path)
+    visualisiere_top_regeln(regeln_df, output_path, metriken="Konfidenz (%)")
 
-    visualisiere_itemsets(itemsets_df, OUTPUT_PATH)  # Visualisierung der Itemsets
-    visualisiere_verteilung_items(daten, OUTPUT_PATH)  # Visualisierung der Item-Verteilung
-    visualisiere_top_regeln(regeln_df, OUTPUT_PATH, metriken="Konfidenz (%)")  # Visualisierung der Regeln
-
-# Startpunkt des Programms
 if __name__ == "__main__":
-    main()  # Starte das Programm
+    main()
